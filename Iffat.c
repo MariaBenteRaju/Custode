@@ -1,134 +1,86 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
-typedef struct {
-    int tripID;
-    char source[15];
-    char destination[15];
-    int availableSeats;
-    float fare;
-} Trip;
+int itemId[100], itemQty[100], reorderLevel[100];
+char itemName[100][50];
+float itemPrice[100];
+int itemCount = 0;
 
-typedef struct {
-    int bookingID;
-    int tripID;
-    char passengerName[15];
-    int seatsBooked;
-} Booking;
+int transItem[500], transQty[500];
+char transType[500][5];
+char transDate[500][12];
+int transCount = 0;
 
-Trip trips[5] = {
-    {1, "Dhaka", "Chittagong", 40, 500},
-    {2, "Dhaka", "Sylhet", 30, 600},
-    {3, "Chittagong", "Cox's Bazar", 20, 300},
-    {4, "Dhaka", "Khulna", 50, 450},
-    {5, "Rajshahi", "Dhaka", 25, 550}
-};
-
-Booking bookings[10];
-int bookingCount = 0;
-
-void showBookings(char *name) {
-    int found = 0;
-    for(int i=0;i<bookingCount;i++){
-        if(strcmp(bookings[i].passengerName,name)==0){
-            found=1;
-            printf("BookingID:%d TripID:%d Seats:%d\n",bookings[i].bookingID,bookings[i].tripID,bookings[i].seatsBooked);
-        }
-    }
-    if(found==0) printf("No bookings\n");
+void addItem() {
+    printf("Enter item name: "); scanf("%s", itemName[itemCount]);
+    itemId[itemCount] = itemCount + 1;
+    printf("Enter quantity: "); scanf("%d", &itemQty[itemCount]);
+    printf("Enter price: "); scanf("%f", &itemPrice[itemCount]);
+    printf("Enter reorder level: "); scanf("%d", &reorderLevel[itemCount]);
+    itemCount++;
+    printf("Item added!\n");
 }
 
-void cancelBooking(int id) {
-    int found=0;
-    for(int i=0;i<bookingCount;i++){
-        if(bookings[i].bookingID==id){
-            found=1;
-            for(int j=0;j<5;j++){
-                if(trips[j].tripID==bookings[i].tripID){
-                    trips[j].availableSeats+=bookings[i].seatsBooked;
-                    break;
-                }
-            }
-            for(int k=i;k<bookingCount-1;k++){
-                bookings[k]=bookings[k+1];
-            }
-            bookingCount--;
-            printf("Booking %d cancelled\n",id);
-            break;
-        }
-    }
-    if(found==0) printf("Booking not found\n");
+void stockIn() {
+    int id, qty;
+    char date[12];
+    printf("Item ID: "); scanf("%d", &id);
+    printf("Quantity: "); scanf("%d", &qty);
+    printf("Date (YYYY-MM-DD): "); scanf("%s", date);
+    itemQty[id-1] += qty;
+
+    transItem[transCount] = id;
+    transQty[transCount] = qty;
+    strcpy(transType[transCount], "IN");
+    strcpy(transDate[transCount], date);
+    transCount++;
+
+    printf("Stock in done!\n");
 }
 
-void adminReport() {
-    int total=0;
-    for(int i=0;i<5;i++){
-        int booked=0;
-        for(int j=0;j<bookingCount;j++){
-            if(bookings[j].tripID==trips[i].tripID) booked+=bookings[j].seatsBooked;
-        }
-        total+=booked*trips[i].fare;
-        printf("TripID:%d %s->%s Passengers:%d Revenue:%.2f\n",trips[i].tripID,trips[i].source,trips[i].destination,booked,booked*trips[i].fare);
-    }
-    printf("Total Revenue:%.2f\n",(float)total);
+void stockOut() {
+    int id, qty;
+    char date[12];
+    printf("Item ID: "); scanf("%d", &id);
+    printf("Quantity: "); scanf("%d", &qty);
+    if(qty > itemQty[id-1]) { printf("Not enough stock!\n"); return; }
+    printf("Date (YYYY-MM-DD): "); scanf("%s", date);
+    itemQty[id-1] -= qty;
+
+    transItem[transCount] = id;
+    transQty[transCount] = qty;
+    strcpy(transType[transCount], "OUT");
+    strcpy(transDate[transCount], date);
+    transCount++;
+
+    printf("Stock out done!\n");
 }
 
-void addBooking() {
-    char name[15];
-    int trip,seats;
-    printf("Your name:");
-    scanf("%s",name);
-    printf("TripID:");
-    scanf("%d",&trip);
-    printf("Seats:");
-    scanf("%d",&seats);
-    for(int i=0;i<5;i++){
-        if(trips[i].tripID==trip){
-            if(trips[i].availableSeats>=seats){
-                trips[i].availableSeats-=seats;
-                bookings[bookingCount].bookingID=bookingCount+1;
-                bookings[bookingCount].tripID=trip;
-                strcpy(bookings[bookingCount].passengerName,name);
-                bookings[bookingCount].seatsBooked=seats;
-                bookingCount++;
-                printf("Booking done! ID:%d\n",bookingCount);
-            }else{
-                printf("Not enough seats\n");
-            }
-            return;
-        }
-    }
-    printf("Trip not found\n");
+void reportStock() {
+    printf("\nID\tName\tQty\tPrice\n");
+    for(int i=0;i<itemCount;i++)
+        printf("%d\t%s\t%d\t%.2f\n", itemId[i], itemName[i], itemQty[i], itemPrice[i]);
 }
 
-int main(){
+void reportLowStock() {
+    printf("\n--- Low Stock ---\n");
+    for(int i=0;i<itemCount;i++)
+        if(itemQty[i] <= reorderLevel[i])
+            printf("%s Qty: %d ReorderLevel: %d\n", itemName[i], itemQty[i], reorderLevel[i]);
+}
+
+int main() {
     int choice;
-    while(1){
-        printf("\n_Booking System_\n");
-        printf("1. Book Tickets\n");
-        printf("2. My Bookings\n");
-        printf("3. Cancel Booking\n");
-        printf("4. Admin Report\n");
-        printf("5. Exit\n");
-        printf("Choice:");
+    while(1) {
+        printf("\n1.Add Item 2.Stock In 3.Stock Out 4.Stock Report 5.Low Stock 6.Exit\nChoice: ");
         scanf("%d",&choice);
-        if(choice==1) addBooking();
-        else if(choice==2){
-            char name[15];
-            printf("Your name:");
-            scanf("%s",name);
-            showBookings(name);
-        }
-        else if(choice==3){
-            int id;
-            printf("BookingID:");
-            scanf("%d",&id);
-            cancelBooking(id);
-        }
-        else if(choice==4) adminReport();
-        else if(choice==5) break;
-        else printf("Invalid\n");
+        if(choice==1) addItem();
+        else if(choice==2) stockIn();
+        else if(choice==3) stockOut();
+        else if(choice==4) reportStock();
+        else if(choice==5) reportLowStock();
+        else break;
     }
+    printf("Exiting...\n");
     return 0;
 }
