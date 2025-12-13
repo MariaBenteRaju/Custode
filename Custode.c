@@ -52,11 +52,11 @@ const char *TRAN_FILE = "transactions.dat";
 
 void inputString(char *s, int size) {
     int c;
-    fflush(stdin);
     if (fgets(s, size, stdin)) {
         s[strcspn(s, "\n")] = 0;
+    } else {
+        s[0] = 0;
     }
-    else s[0] = 0;
     while ((c = getchar()) != '\n' && c != EOF); /* clear extra input */
 }
 
@@ -147,6 +147,7 @@ void addItem() {
     Item it;
     it.id = itemCount + 1;
     printf("Enter Item Name: ");
+    getchar(); /* consume leftover newline */
     inputString(it.name, MAX_NAME);
 
     listCategories();
@@ -155,7 +156,6 @@ void addItem() {
 
     if (findCategoryIndexById(it.category_id) == -1) {
         printf("Invalid Category.\n");
-        getchar();
         return;
     }
 
@@ -165,7 +165,6 @@ void addItem() {
     scanf("%d", &it.reorder_level);
     printf("Price: ");
     scanf("%f", &it.price);
-    getchar();
 
     items[itemCount++] = it;
     printf("Item Added.\n");
@@ -200,7 +199,6 @@ void editItem() {
     scanf("%d", &items[idx].reorder_level);
     printf("New Price: ");
     scanf("%f", &items[idx].price);
-    getchar();
 
     printf("Item Updated.\n");
 }
@@ -220,12 +218,13 @@ void deleteItem() {
 void searchItem() {
     char name[MAX_NAME];
     printf("Search Item Name: ");
-    getchar(); /* ensure buffer clean */
+    getchar();
     inputString(name, MAX_NAME);
     printf("\nSearch Results:\n");
     for (int i = 0; i < itemCount; i++) {
         if (strstr(items[i].name, name)) {
-            printf("ID:%d | %s | Qty:%d\n", items[i].id, items[i].name, items[i].quantity);
+            printf("ID:%d | %s | Qty:%d\n",
+                   items[i].id, items[i].name, items[i].quantity);
         }
     }
 }
@@ -234,7 +233,8 @@ void searchItem() {
 
 int validateStock(Item *item, StockTransaction *tx) {
     if (tx->type == STOCK_OUT && item->quantity < tx->amount) {
-        printf("Not enough stock! Available:%d, Required:%d\n", item->quantity, tx->amount);
+        printf("Not enough stock! Available:%d, Required:%d\n",
+               item->quantity, tx->amount);
         return 0;
     }
     return 1;
@@ -252,7 +252,8 @@ void updateStock(Item *item, StockTransaction *tx) {
 
 void recordTransaction(StockTransaction *tx) {
     int count = 0;
-    StockTransaction *all = loadAllRecords(TRAN_FILE, sizeof(StockTransaction), &count);
+    StockTransaction *all =
+        (StockTransaction *)loadAllRecords(TRAN_FILE, sizeof(StockTransaction), &count);
     tx->transactionId = (all && count > 0) ? all[count-1].transactionId + 1 : 1;
     free(all);
     if (appendRecord(TRAN_FILE, tx, sizeof(StockTransaction)))
@@ -279,11 +280,104 @@ void doStock(const char *username, const char *role, StockType type) {
     strncpy(tx.username, username, MAX_NAME);
     strncpy(tx.role, role, MAX_ROLE);
     tx.username[MAX_NAME-1] = 0;
-    tx.role[MAX_ROLE-1] = 0;
+    tx.role[MAX_ROLE-1]     = 0;
 
     if (!validateStock(&items[idx], &tx)) return;
     updateStock(&items[idx], &tx);
     recordTransaction(&tx);
+}
+
+/* ========= REPORTS MODULE (Member 5) ========= */
+
+void reportLowStock() {
+    printf("\n--- Low Stock Items (Qty <= Reorder Level) ---\n");
+    int found = 0;
+    for (int i = 0; i < itemCount; i++) {
+        if (items[i].quantity <= items[i].reorder_level) {
+            printf("ID:%d | %s | Qty:%d | Reorder:%d\n",
+                   items[i].id,
+                   items[i].name,
+                   items[i].quantity,
+                   items[i].reorder_level);
+            found = 1;
+        }
+    }
+    if (!found) printf("No low stock items.\n");
+}
+
+void reportTransactionsByItem() {
+    int itemId;
+    printf("Enter Item ID for transaction report: ");
+    scanf("%d", &itemId);
+
+    int count = 0;
+    StockTransaction *txs =
+        (StockTransaction *)loadAllRecords(TRAN_FILE, sizeof(StockTransaction), &count);
+    if (!txs || count == 0) {
+        printf("No transactions found.\n");
+        free(txs);
+        return;
+    }
+
+    printf("\n--- Transactions for Item ID %d ---\n", itemId);
+    int found = 0;
+    for (int i = 0; i < count; i++) {
+        if (txs[i].itemId == itemId) {
+            printf("#%d | %s | User:%s | Qty:%d\n",
+                   txs[i].transactionId,
+                   txs[i].type == STOCK_IN ? "IN " : "OUT",
+                   txs[i].username,
+                   txs[i].amount);
+            found = 1;
+        }
+    }
+    if (!found) printf("No transactions for this item.\n");
+    free(txs);
+}
+
+void reportTransactionsByUser() {
+    char user[50];
+    printf("Enter username for transaction report: ");
+    scanf("%s", user);
+
+    int count = 0;
+    StockTransaction *txs =
+        (StockTransaction *)loadAllRecords(TRAN_FILE, sizeof(StockTransaction), &count);
+    if (!txs || count == 0) {
+        printf("No transactions found.\n");
+        free(txs);
+        return;
+    }
+
+    printf("\n--- Transactions by User '%s' ---\n", user);
+    int found = 0;
+    for (int i = 0; i < count; i++) {
+        if (strcmp(txs[i].username, user) == 0) {
+            printf("#%d | ItemID:%d | %s | Qty:%d\n",
+                   txs[i].transactionId,
+                   txs[i].itemId,
+                   txs[i].type == STOCK_IN ? "IN " : "OUT",
+                   txs[i].amount);
+            found = 1;
+        }
+    }
+    if (!found) printf("No transactions by this user.\n");
+    free(txs);
+}
+
+void reportMenu() {
+    int ch;
+    do {
+        printf("\n--- Reports Menu ---\n");
+        printf("1. Low Stock Items\n");
+        printf("2. Transactions by Item\n");
+        printf("3. Transactions by User\n");
+        printf("4. Back\nChoice: ");
+        scanf("%d", &ch);
+        if (ch == 1) reportLowStock();
+        else if (ch == 2) reportTransactionsByItem();
+        else if (ch == 3) reportTransactionsByUser();
+    } while (ch != 4);
 }
 
 /* ========= LOGIN (TEXT FILE BASED) ========= */
@@ -365,7 +459,7 @@ void categoryMenu() {
     do {
         printf("\n--- Category Menu ---\n");
         printf("1.Add  2.Edit  3.Delete  4.List  5.Back\nChoice: ");
-        scanf("%d", &ch); getchar();
+        scanf("%d", &ch);
         if (ch == 1) addCategory();
         else if (ch == 2) editCategory();
         else if (ch == 3) deleteCategory();
@@ -378,7 +472,7 @@ void itemMenu() {
     do {
         printf("\n--- Item Menu ---\n");
         printf("1.Add  2.Edit  3.Delete  4.List  5.Search  6.Back\nChoice: ");
-        scanf("%d", &ch); getchar();
+        scanf("%d", &ch);
         if (ch == 1) addItem();
         else if (ch == 2) editItem();
         else if (ch == 3) deleteItem();
@@ -395,13 +489,15 @@ void adminMenu(const char *admin) {
         printf("2.Item Management\n");
         printf("3.Stock In\n");
         printf("4.Stock Out\n");
-        printf("5.Logout\nChoice: ");
+        printf("5.Reports\n");
+        printf("6.Logout\nChoice: ");
         scanf("%d", &ch);
         if (ch == 1) categoryMenu();
         else if (ch == 2) itemMenu();
         else if (ch == 3) doStock(admin, "admin", STOCK_IN);
         else if (ch == 4) doStock(admin, "admin", STOCK_OUT);
-    } while (ch != 5);
+        else if (ch == 5) reportMenu();
+    } while (ch != 6);
 }
 
 void staffMenu(const char *user) {
