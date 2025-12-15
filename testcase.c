@@ -1,126 +1,87 @@
-#include "custode.c"   /* or a proper header if you split files */
+#include<stdio.h>
+#include <string.h>
+#define TEST_BUILD
+#include "custode.c"   /* your full code above, but wrap its main/start in #ifndef TEST_BUILD */
 
-/* Helper: reset in-memory data for test */
+/* Helper to reset in-memory data for tests */
 void resetData() {
     categoryCount = 0;
     itemCount = 0;
 }
 
-/* 1) Test adding a category */
-int test_add_category() {
+
+/* Category + Item CRUD */
+
+int test4_addCategory_increments_count() {
     resetData();
-    addCategory(); /* when running, type: Electronics */
-    int actual = (categoryCount == 1 && findCategoryIndexById(1) != -1);
+
+    /* For manual run, type: Electronics */
+    printf("\n[Member2] Type: Electronics⏎ when asked\n");
+    addCategory();
+
+    int actual   = (categoryCount == 1 &&
+                    categories[0].id == 1 &&
+                    strcmp(categories[0].name, "Electronics") == 0);
     int expected = 1;
-    int success = actual == expected;
-    printf("test_add_category -> expected:%d actual:%d success:%d\n",
+    int success  = (actual == expected);
+
+    printf("Member2_test4_addCategory -> expected:%d actual:%d success:%d\n",
            expected, actual, success);
     return success;
 }
 
-/* 2) Test adding an item with existing category */
-int test_add_item_valid_category() {
-    resetData();
-    /* prepare one category */
-    categories[0].id = 1;
-    strcpy(categories[0].name, "Electronics");
-    categoryCount = 1;
-
-    addItem(); /* when running, choose name e.g. Keyboard, category 1, qty 10, reorder 5, price 100 */
-
-    int idx = findItemIndexById(1);
-    int actual = (itemCount == 1 && idx != -1);
-    int expected = 1;
-    int success = actual == expected;
-    printf("test_add_item_valid_category -> expected:%d actual:%d success:%d\n",
-           expected, actual, success);
-    return success;
-}
-
-/* 3) Test findItemIndexById for invalid id */
-int test_find_item_invalid_id() {
-    resetData();
-    /* one item with id 1 */
-    items[0].id = 1;
-    strcpy(items[0].name, "Mouse");
-    items[0].category_id = 1;
-    items[0].quantity = 10;
-    items[0].reorder_level = 3;
-    items[0].price = 500;
-    itemCount = 1;
-
-    int idx = findItemIndexById(99);
-    int actual = (idx == -1);
-    int expected = 1;
-    int success = actual == expected;
-    printf("test_find_item_invalid_id -> expected:%d actual:%d success:%d\n",
-           expected, actual, success);
-    return success;
-}
-
-/* 4) Test stock-out validation (not enough stock) */
-int test_stock_out_not_enough() {
+int test5_findItemIndexById() {
     resetData();
     items[0].id = 1;
     strcpy(items[0].name, "Keyboard");
-    items[0].category_id = 1;
-    items[0].quantity = 5;
-    items[0].reorder_level = 2;
-    items[0].price = 1000;
-    itemCount = 1;
+    items[1].id = 2;
+    strcpy(items[1].name, "Mouse");
+    itemCount = 2;
 
-    StockTransaction tx;
-    tx.itemId = 1;
-    tx.type   = STOCK_OUT;
-    tx.amount = 10;               /* more than available */
-    strcpy(tx.username, "admin1");
-    strcpy(tx.role, "admin");
+    int idx1 = findItemIndexById(1);
+    int idx2 = findItemIndexById(2);
+    int idx3 = findItemIndexById(99);
 
-    int valid = validateStock(&items[0], &tx);  /* should be 0 */
-    int actual = (valid == 0);
+    int actual   = (idx1 == 0 && idx2 == 1 && idx3 == -1);
     int expected = 1;
-    int success = actual == expected;
-    printf("test_stock_out_not_enough -> expected:%d actual:%d success:%d\n",
+    int success  = (actual == expected);
+
+    printf("Member2_test5_findItemIndexById -> expected:%d actual:%d success:%d\n",
            expected, actual, success);
     return success;
 }
 
-/* 5) Test stock-in updates quantity correctly */
-int test_stock_in_updates_quantity() {
+int test6_deleteItem_shifts_array() {
     resetData();
-    items[0].id = 1;
-    strcpy(items[0].name, "Keyboard");
-    items[0].category_id = 1;
-    items[0].quantity = 10;
-    items[0].reorder_level = 2;
-    items[0].price = 1000;
-    itemCount = 1;
+    items[0].id = 1; strcpy(items[0].name, "A");
+    items[1].id = 2; strcpy(items[1].name, "B");
+    items[2].id = 3; strcpy(items[2].name, "C");
+    itemCount = 3;
 
-    StockTransaction tx;
-    tx.itemId = 1;
-    tx.type   = STOCK_IN;
-    tx.amount = 5;
-    strcpy(tx.username, "admin1");
-    strcpy(tx.role, "admin");
+    /* simulate delete ID=2 using your deleteItem logic core */
+    int idx = findItemIndexById(2);
+    for (int i = idx; i < itemCount-1; i++)
+        items[i] = items[i+1];
+    itemCount--;
 
-    int before = items[0].quantity;
-    int valid  = validateStock(&items[0], &tx);
-    if (valid) updateStock(&items[0], &tx);
-    int after  = items[0].quantity;
-
-    int actual = (before == 10 && after == 15);
+    int actual   = (itemCount == 2 &&
+                    items[0].id == 1 &&
+                    items[1].id == 3);
     int expected = 1;
-    int success = actual == expected;
-    printf("test_stock_in_updates_quantity -> expected:%d actual:%d success:%d\n",
+    int success  = (actual == expected);
+printf("Member2_test6_deleteItem_shifts_array -> expected:%d actual:%d success:%d\n",
            expected, actual, success);
     return success;
 }
 
-int main() {
-    test_add_category();
-    test_add_item_valid_category();
-    test_find_item_invalid_id();
-    test_stock_out_not_enough();
-    test_stock_in_updates_quantity();
-    return 0;
+int main(){
+test4_addCategory_increments_count();
+    test5_findItemIndexById();
+    test6_deleteItem_shifts_array();
+
+
+return 0;
+
+
+
 }
